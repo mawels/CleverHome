@@ -1,0 +1,45 @@
+#!/usr/bin/python3
+
+import subprocess, urllib3, json, sys, os, mimetypes
+from flask import Flask,render_template,request
+app = Flask(__name__)
+
+workdir = os.path.dirname(sys.argv[0])
+os.chdir(workdir)
+
+backend = "http://192.168.0.110:8080"
+
+@app.route("/")
+@app.route("/index.html")
+def home():
+    http = urllib3.PoolManager()
+    response = http.request('GET', backend + '/get_remotes')
+    json_devices = response.data
+    devices = json.loads(json_devices)
+    name=request.args.get('name', type=str)
+    return render_template("rc.html", device=name, lines=devices[name], backend=backend)
+
+@app.route("/rc.html")
+def remote():
+    http = urllib3.PoolManager()
+    response = http.request('GET', backend + '/get_remotes') 
+    json_devices = response.data.decode('utf-8')
+    devices = json.loads(json_devices)
+    print(devices)
+    name=request.args.get('name', type=str)
+    return render_template("rc.html", device=name, lines=devices[name]["codes"], type=devices[name]["type"], backend=backend)
+
+@app.route("/<path:path>")
+def files(path):
+    extension = os.path.basename(path).split('.')[-1]
+    mimetypes.types_map['.json'] = 'application/json'
+    try:
+        file = open("files/" + path, 'r')
+        data = file.read()
+        file.close()
+    except IOError as e:
+        return e.strerror, 404, { "Content-Type" : "text/plain" }
+    return data, 200, { "Content-Type" : mimetypes.types_map['.' + extension] }
+
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=80, threaded=True)

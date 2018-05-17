@@ -1,0 +1,16 @@
+{
+  "name": "Clever Home",
+  "description": "Aplicacion para controlar remotamente dispositivos conectados a una Raspberry",
+  "orientation": "portrait",
+  "display": "standalone",
+  "icons": [{
+    "src": "/images/ch.png",
+    "sizes": "100x100",
+    "type": "image/png"
+  },
+  {
+    "src": "/images/ch.png",
+    "sizes": "1000x1000",
+    "type": "image/png"
+  }]
+}

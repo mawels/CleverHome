@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sudo irsend SEND_ONCE AOCTV KEY_POWER

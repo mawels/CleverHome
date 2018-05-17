@@ -1,0 +1,27 @@
+#!/bin/bash
+
+NEW="$1"
+[ -z "$2" ] && CUR="$(cat current_input)" || CUR="$2"
+
+
+irsend SEND_ONCE AOCTV KEY_AUX
+
+if [ "$NEW" -gt "$CUR" ]
+then
+    KEY="KEY_DOWN"
+    SQ="$(( $NEW - $CUR ))"
+elif [ "$NEW" -lt "$CUR" ]
+then
+    KEY="KEY_UP"
+    SQ="$(( $CUR - $NEW ))"
+fi
+
+for i in $( seq $SQ )
+do
+    sleep 0.3
+    irsend SEND_ONCE AOCTV $KEY
+done
+
+sleep 0.3
+sudo irsend SEND_ONCE AOCTV KEY_ENTER
+echo $NEW > current_input

@@ -1,0 +1,41 @@
+body {
+    background-color: black;
+}
+
+.rcbody {
+    background-color: black;
+    user-select: none;
+    min-width: 400px;
+    min-height: 800px;
+    color: lightgray;
+}
+
+.button3 {
+    display: inline-block;
+    text-align: center;
+    vertical-align: middle;
+    width: 30%;
+    height: 6.2%;
+    text-align: center;
+}
+
+.button3 div {
+    margin-top: 2vh;
+}
+
+.button4 {
+    display: inline-block;
+    text-align: center;
+    vertical-align: middle;
+    width: 22%;
+    height: 6.2%;
+    text-align: center;
+}
+
+.button4 div {
+    margin-top: 2vh;
+}
+
+#SEP {
+    background-color: black;
+}

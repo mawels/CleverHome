@@ -1,0 +1,115 @@
+#!/usr/bin/python3
+
+import subprocess, json, sys, os
+from lirc import lirc
+from flask import Flask
+from flask_restful import Resource, Api, reqparse
+
+workdir = os.path.dirname(sys.argv[0])
+os.chdir(workdir)
+
+app = Flask(__name__)
+api = Api(app)
+
+class Config():
+    def load(self, file):
+        configfile = open(file, 'r')
+        json_config = configfile.read()
+        configfile.close()
+        config = json.loads(json_config)
+        return config
+
+    def save(self, config, file):
+        json_config = json.dumps(remotes, indent=4)
+        configfile = open(file, 'w')
+        configfile.write(json_config)
+        configfile.close()
+        return config
+
+    def generate(self):
+        config = {}
+        remotes = self.get_remotes()
+        for remote in remotes:
+            codes = self.get_remote_codes(remote)
+            grid = self.arrange_buttons(codes, 4)
+            config[remote]["codes"]=grid
+            config[remote]["type"]="lirc"
+        return config
+
+    def get_remotes(self):
+        remotes = lirc.get_remotes()
+        return remotes
+
+    def get_remote_codes(self, remote):
+        return lirc.get_remote_codes(remote)
+
+    def arrange_buttons(self, codes, linelen):
+        grid = []
+        line = []
+        for code in codes:
+            line.append(code)
+            if len(line) >= linelen:
+                grid.append(line)
+                line = []
+        return grid
+
+file = 'config.json'
+config = Config()
+
+class get_remotes(Resource):
+    def get(self):
+        remotes = config.load(file)
+        return remotes
+
+class send_once(Resource):
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('remote')
+        parse.add_argument('key')
+        args = parse.parse_args()
+        remote = args['remote']
+        key = args['key']
+        if(remotes[remote]["type"] == "lirc"):
+            lirc.send_once(remote, key)
+        return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
+
+class send_start(Resource):
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('remote')
+        parse.add_argument('key')
+        args = parse.parse_args()
+        remote = args['remote']
+        key = args['key']
+        if(remotes[remote]["type"] == "lirc"):
+            lirc.send_start(remote, key)
+        return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
+
+class send_stop(Resource):
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('remote')
+        parse.add_argument('key')
+        args = parse.parse_args()
+        remote = args['remote']
+        key = args['key']
+        if(remotes[remote]["type"] == "lirc"):
+            lirc.send_stop(remote, key)
+        return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
+
+api.add_resource(get_remotes, '/get_remotes')
+api.add_resource(send_once, '/send_once')
+api.add_resource(send_start, '/send_start')
+api.add_resource(send_stop, '/send_stop')
+
+lastkey = "none"
+
+if __name__ == '__main__':
+    config = Config()
+    try:
+        remotes = config.load(file)
+    except:
+        remotes = config.generate()
+        if not os.path.exists(file):
+            config.save(remotes, file)
+    app.run(host="0.0.0.0", port=8080, threaded=True)
