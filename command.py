@@ -78,7 +78,8 @@ class commandRemotesManager:
     
     def list_remotes(self):
         remotes = []
-        for (name, codes) in self.remote_definitions.
+        for (name, codes) in self.remote_definitions.items():
+            remotes.append(name)
 
     def __init__(self):
         self.load_remotes()

@@ -2,6 +2,7 @@
 
 import subprocess, json, sys, os
 from lirc import lirc
+from command import command
 from flask import Flask
 from flask_restful import Resource, Api, reqparse
 
@@ -12,38 +13,49 @@ app = Flask(__name__)
 api = Api(app)
 
 class Config():
-    def load(self, file):
-        configfile = open(file, 'r')
-        json_config = configfile.read()
-        configfile.close()
-        config = json.loads(json_config)
-        return config
+    __file = 'config.json'
+    __modules = []
+    __remotes = {}
+    
+    def load(self):
+        try:
+            configfile = open(self.__file, 'r')
+            json_config = configfile.read()
+            configfile.close()
+            self.__remotes = json.loads(json_config)
+        except IOError as e:          
+            print(e.strerror)
+        return
 
-    def save(self, config, file):
-        json_config = json.dumps(remotes, indent=4)
-        configfile = open(file, 'w')
+    def save(self):
+        json_config = json.dumps(self.__remotes, indent=4)
+        configfile = open(self.__file, 'w')
         configfile.write(json_config)
         configfile.close()
-        return config
+        return
 
     def generate(self):
         config = {}
-        remotes = self.get_remotes()
-        for remote in remotes:
-            codes = self.get_remote_codes(remote)
-            grid = self.arrange_buttons(codes, 4)
-            config[remote]["codes"]=grid
-            config[remote]["type"]="lirc"
-        return config
+        remote_names = self.__get_remote_names()
+        print(remote_names)
+        for remote_name in remote_names:
+            codes = self.__get_remote_codes(remote_name)
+            grid = self.__arrange_buttons(codes, 4)
+            config[remote_name] = {}
+            config[remote_name]["codes"]=grid
+            config[remote_name]["type"]="lirc"
+        self.__remotes = config
 
-    def get_remotes(self):
-        remotes = lirc.get_remotes()
-        return remotes
+    def __get_remote_names(self):
+        remote_names = []
+        for name, module in self.__modules.items():
+            remote_names.extend(module.get_remotes())
+        return remote_names
 
-    def get_remote_codes(self, remote):
+    def __get_remote_codes(self, remote):
         return lirc.get_remote_codes(remote)
 
-    def arrange_buttons(self, codes, linelen):
+    def __arrange_buttons(self, codes, linelen):
         grid = []
         line = []
         for code in codes:
@@ -52,14 +64,23 @@ class Config():
                 grid.append(line)
                 line = []
         return grid
+    
+    def get_file(self):
+        return self.__file
 
-file = 'config.json'
-config = Config()
+    def get_remotes(self):
+        return self.__remotes
+    
+    def set_modules(self, modules):
+        self.__modules = modules
+    
+    def get_modules(self):
+        return self.__modules
 
 class get_remotes(Resource):
     def get(self):
-        remotes = config.load(file)
-        return remotes
+        config.load()
+        return config.get_remotes()
 
 class send_once(Resource):
     def post(self):
@@ -69,8 +90,9 @@ class send_once(Resource):
         args = parse.parse_args()
         remote = args['remote']
         key = args['key']
-        if(remotes[remote]["type"] == "lirc"):
-            lirc.send_once(remote, key)
+        remote_type = config.get_remotes()[remote]["type"]
+        modules = config.get_modules()
+        modules[remote_type].send_once(remote, key)
         return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
 
 class send_start(Resource):
@@ -81,8 +103,9 @@ class send_start(Resource):
         args = parse.parse_args()
         remote = args['remote']
         key = args['key']
-        if(remotes[remote]["type"] == "lirc"):
-            lirc.send_start(remote, key)
+        remote_type = config.get_remotes()[remote]["type"]
+        modules = config.get_modules()
+        modules[remote_type].send_start(remote, key)
         return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
 
 class send_stop(Resource):
@@ -93,8 +116,9 @@ class send_stop(Resource):
         args = parse.parse_args()
         remote = args['remote']
         key = args['key']
-        if(remotes[remote]["type"] == "lirc"):
-            lirc.send_stop(remote, key)
+        remote_type = config.get_remotes()[remote]["type"]
+        modules = config.get_modules()
+        modules[remote_type].send_stop(remote, key)
         return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
 
 api.add_resource(get_remotes, '/get_remotes')
@@ -106,10 +130,11 @@ lastkey = "none"
 
 if __name__ == '__main__':
     config = Config()
-    try:
-        remotes = config.load(file)
-    except:
-        remotes = config.generate()
-        if not os.path.exists(file):
-            config.save(remotes, file)
+    modules = { 'lirc': lirc }
+    config.set_modules(modules)
+    if not os.path.exists(config.get_file()):
+            config.generate()
+            config.save()
+    remotes = config.load()
+        
     app.run(host="0.0.0.0", port=8080, threaded=True)
