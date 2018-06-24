@@ -3,37 +3,32 @@ body {
 }
 
 .rcbody {
-    background-color: black;
     user-select: none;
-    min-width: 400px;
-    min-height: 800px;
+    /* min-width: 400px; */
+    /* min-height: 800px; */
     color: lightgray;
 }
 
-.button3 {
-    display: inline-block;
-    text-align: center;
+.button-commons {
+    display: table;
+    height: 6.2%;    
+}
+
+.button-label {
+    display: table-cell;
     vertical-align: middle;
-    width: 30%;
-    height: 6.2%;
-    text-align: center;
 }
 
-.button3 div {
-    margin-top: 2vh;
+.button-2 {
+
 }
 
-.button4 {
-    display: inline-block;
-    text-align: center;
-    vertical-align: middle;
-    width: 22%;
-    height: 6.2%;
-    text-align: center;
+.button-3 {
+
 }
 
-.button4 div {
-    margin-top: 2vh;
+.button-4 {
+
 }
 
 #SEP {

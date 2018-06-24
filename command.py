@@ -1,56 +1,48 @@
 import subprocess, json
 from pathlib import Path
 
-class command:
+class Command:    
     @staticmethod
-    def send_once(remote, key):
-        run = subprocess.Popen("", stdout=subprocess.PIPE, shell=True)
-        if(run.returncode == 0):
-            return True
-        else:
-            return False
+    def send_once(remote_name, key):
+        commandRemoteManager = CommandRemoteManager()
+        commandRemoteManager.send_key(remote_name, key)
 
     @staticmethod
-    def send_start(remote, key):
-        run = subprocess.Popen("", stdout=subprocess.PIPE, shell=True)
-        if(run.returncode == 0):
-            return True
-        else:
-            return False
-
+    def send_start(remote_name, key):
+        return 
+        
     @staticmethod        
-    def send_stop(remote, key):
-        run = subprocess.Popen("", stdout=subprocess.PIPE, shell=True)
-        if(run.returncode == 0):
-            return True
-        else:
-            return False
+    def send_stop(remote_name, key):
+        return
+        
     
     @staticmethod
     def get_remotes():
-        run = subprocess.Popen("irsend list '' '' | grep -v '^$'", stdout=subprocess.PIPE, shell=True)
-        if(run.returncode == 0):
-            (stdout, stderr) = run.communicate()
-            remotes = stdout.splitlines()
-            return remotes
+        commandRemoteManager = CommandRemoteManager()
+        return commandRemoteManager.get_remote_names()
     
     @staticmethod
-    def get_remote_codes(self, remote):
-        run = subprocess.Popen("irsend list " + remote + " \ ", stdout=subprocess.PIPE, shell=True)
-        (stdout, stderr) = run.communicate()
+    def get_remote_codes(remote_name):
+        commandRemoteManager = CommandRemoteManager()
         codes = []
-        for line in stdout.splitlines():
-            code = line.split(" ")
-            if len(code) == 2:
-                code_label = {}
-                code_label['code']=code[1]
-                code_label['label']=code[1]
-                codes.append(code_label)
+        remote = commandRemoteManager.get_remote(remote_name)
+        print(remote)
+        for key, command in remote.items():
+            code = {}
+            code["code"]=key
+            code["label"]=key
+            codes.append(code)
         return codes
 
-class commandRemotesManager:
+
+
+        
+class CommandRemoteManager:
     config_file = 'command.remotes.json'
     remote_definitions = {}
+
+    def __init__(self):
+        self.load_remotes()
 
     def load_remotes(self):
         try:    
@@ -59,7 +51,7 @@ class commandRemotesManager:
             self.remote_definitions = json.loads(json_remote_definitions)
         except IOError:
             if(not Path(self.config_file).is_file()):
-                file = open(self.config_file, 'w')
+                self.save_remotes()
                 file.close()
     
     def save_remotes(self):
@@ -72,14 +64,23 @@ class commandRemotesManager:
             print("Error guardando configuracion: " + IOError.strerror)
             return False
     
-    def add_remote(self, remote):
-        self.remote_definitions.extend(remote)
+    def add_remote(self, remote_name):
+        self.remote_definitions.extend(remote_name)
         self.save_remotes()
     
-    def list_remotes(self):
+    def get_remote_names(self):
         remotes = []
-        for (name, codes) in self.remote_definitions.items():
+        for name, codes in self.remote_definitions.items():
             remotes.append(name)
+        return remotes
 
-    def __init__(self):
-        self.load_remotes()
+    def get_remote(self, name):
+        return self.remote_definitions[name]
+    
+    def send_key(self, remote_name, key):
+        command = self.remote_definitions[remote_name][key]
+        run = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+        (stdout, stderr) = run.communicate()
+        print(stdout)
+        print(stderr)
+        return

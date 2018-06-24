@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
 import subprocess, json, sys, os
-from lirc import lirc
-from command import command
+from lirc import Lirc
+from command import Command
+from rf import Rf
 from flask import Flask
 from flask_restful import Resource, Api, reqparse
 
@@ -37,13 +38,12 @@ class Config():
     def generate(self):
         config = {}
         remote_names = self.__get_remote_names()
-        print(remote_names)
         for remote_name in remote_names:
             codes = self.__get_remote_codes(remote_name)
             grid = self.__arrange_buttons(codes, 4)
             config[remote_name] = {}
             config[remote_name]["codes"]=grid
-            config[remote_name]["type"]="lirc"
+            config[remote_name]["type"]=self.__get_remote_type(remote_name)
         self.__remotes = config
 
     def __get_remote_names(self):
@@ -51,18 +51,32 @@ class Config():
         for name, module in self.__modules.items():
             remote_names.extend(module.get_remotes())
         return remote_names
+    
+    def __get_remote_type(self, remote_name):
+        for name, module in self.__modules.items():
+            if remote_name in module.get_remotes():
+                return name
 
-    def __get_remote_codes(self, remote):
-        return lirc.get_remote_codes(remote)
+    def __get_remote_codes(self, remote_name):
+        for name, module in self.__modules.items():
+            if remote_name in module.get_remotes():
+                print("Codes for: " + remote_name + ": ")
+                print(module.get_remote_codes(remote_name))
+                print("")
+                return module.get_remote_codes(remote_name)
 
     def __arrange_buttons(self, codes, linelen):
         grid = []
         line = []
+        if len(codes) < linelen:
+            linelen = len(codes)
         for code in codes:
             line.append(code)
-            if len(line) >= linelen:
+            if (len(line) >= linelen):
                 grid.append(line)
                 line = []
+                first_line=False
+        print(grid)
         return grid
     
     def get_file(self):
@@ -81,6 +95,7 @@ class get_remotes(Resource):
     def get(self):
         config.load()
         return config.get_remotes()
+api.add_resource(get_remotes, '/get_remotes')
 
 class send_once(Resource):
     def post(self):
@@ -94,6 +109,7 @@ class send_once(Resource):
         modules = config.get_modules()
         modules[remote_type].send_once(remote, key)
         return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
+api.add_resource(send_once, '/send_once')
 
 class send_start(Resource):
     def post(self):
@@ -107,6 +123,7 @@ class send_start(Resource):
         modules = config.get_modules()
         modules[remote_type].send_start(remote, key)
         return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
+api.add_resource(send_start, '/send_start')
 
 class send_stop(Resource):
     def post(self):
@@ -120,17 +137,12 @@ class send_stop(Resource):
         modules = config.get_modules()
         modules[remote_type].send_stop(remote, key)
         return "Success", 200, { "Access-Control-Allow-Origin" : "*" }
-
-api.add_resource(get_remotes, '/get_remotes')
-api.add_resource(send_once, '/send_once')
-api.add_resource(send_start, '/send_start')
 api.add_resource(send_stop, '/send_stop')
-
-lastkey = "none"
 
 if __name__ == '__main__':
     config = Config()
-    modules = { 'lirc': lirc }
+    command = Command()
+    modules = { 'lirc': Lirc, 'command' : command, 'rf': Rf }
     config.set_modules(modules)
     if not os.path.exists(config.get_file()):
             config.generate()

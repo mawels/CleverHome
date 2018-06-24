@@ -14,10 +14,11 @@ backend = "http://192.168.0.110:8080"
 def home():
     http = urllib3.PoolManager()
     response = http.request('GET', backend + '/get_remotes')
-    json_devices = response.data
+    json_devices = response.data.decode('utf-8')
     devices = json.loads(json_devices)
-    name=request.args.get('name', type=str)
-    return render_template("rc.html", device=name, lines=devices[name], backend=backend)
+    keys = sorted(devices)
+    name = list(devices.keys())[0]
+    return render_template("index.html", remotes=devices, ordRemoteNames=keys, backend=backend)
 
 @app.route("/rc.html")
 def remote():
