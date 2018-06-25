@@ -1,5 +1,5 @@
-# clever-home
-As a hobby project, I'm creating a very simple set of python scripts to control devices from a RaspBerry Pi using infrared and rf emitters.
+# Clever-Home
+As a hobby project, I'm developing a very simple set of python scripts to control devices from a RaspBerry Pi using infrared and rf emitters.
 
 Requeriments:
 
