@@ -1,16 +1,89 @@
 #!/usr/bin/python3
 
-import subprocess, urllib3, json, sys, os, mimetypes
-from flask import Flask,render_template,request
-app = Flask(__name__)
+import subprocess, urllib3, json, sys, os, mimetypes, hashlib
+from flask import Flask,render_template,request,redirect,session
+from functools import wraps
 
+app = Flask(__name__)
+app.secret_key = "--!clever-home.secret!--"
 workdir = os.path.dirname(sys.argv[0])
 os.chdir(workdir)
 
+app.secret_key = "--!clever-home.secret!--"
+users_config_file="users.json"
 backend = "http://192.168.0.110:8080"
 
+# Security
+# This lines are useful to handle HTTP basic authentication.
+def check_credentials(username, password):
+    usersfile = open(users_config_file, 'r')
+    users_data = usersfile.read()
+    users = json.loads(users_data)
+    usersfile.close()
+    
+    if username in users:
+        storedHash = users[username]
+        passwordHash = hashlib.md5(password.encode("utf-8")).hexdigest()
+        if storedHash == passwordHash:
+            return True
+    return False
+        
+
+    return True
+    
+def redirect_to_login(message = None, error = None):
+    if message is not None:
+        return redirect("/login.html?message=" + message, 302)
+    if error is not None:
+        return redirect("/login.html?error=" + error, 302)    
+    return redirect("/login.html", 302)
+
+def redirect_to_home():
+    return redirect("/", 302)
+
+def auth_needed(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "username" not in session:
+            return redirect_to_login("Identifiquese para tener acceso.")
+        return f(*args, **kwargs)
+    return decorated
+
+# Login form
+@app.route("/login.html", methods=["GET"])
+def login():
+    msg = ""
+    err = ""
+    if "message" in request.args.keys():
+        msg = request.args["message"]
+    
+    if "error" in request.args.keys():    
+        err = request.args["error"]
+    
+    return render_template("login.html", message=msg, error=err)
+
+# Process auth request and create session cookie
+@app.route("/login.html", methods=["POST"])
+def authenticate():
+    username = request.form["username"]
+    password = request.form["password"]
+
+    if check_credentials(username, password):
+        session['username'] = username
+        return redirect_to_home()
+    return redirect_to_login(error="Nombre de usuario o contraseña incorrectos.")
+
+# Logout form
+@app.route("/logout.html", methods=["GET"])
+def logout():
+    session.pop("username", None)
+    return redirect_to_home()
+
+
+# This is te app main page
 @app.route("/")
 @app.route("/index.html")
+@auth_needed
 def home():
     http = urllib3.PoolManager()
     response = http.request('GET', backend + '/get_remotes')
@@ -18,18 +91,36 @@ def home():
     devices = json.loads(json_devices)
     keys = sorted(devices)
     name = list(devices.keys())[0]
-    return render_template("index.html", remotes=devices, ordRemoteNames=keys, backend=backend)
+    return render_template("index.html", remotes=devices, ordRemoteNames=keys)
 
-@app.route("/rc.html")
-def remote():
+# It sends send_once events from remote controls to backend. Required when user is outside the local network.
+@app.route("/send_once", methods=["POST"])
+@auth_needed
+def send_once():
+    remote = request.form["remote"]
+    key = request.form["key"]
     http = urllib3.PoolManager()
-    response = http.request('GET', backend + '/get_remotes') 
-    json_devices = response.data.decode('utf-8')
-    devices = json.loads(json_devices)
-    print(devices)
-    name=request.args.get('name', type=str)
-    return render_template("rc.html", device=name, lines=devices[name]["codes"], type=devices[name]["type"], backend=backend)
+    response = http.request('POST', backend + '/send_once', fields={ "remote" : remote, "key" : key })
 
+# It sends send_start events from remote controls to backend. Required when user is outside the local network.
+@app.route("/send_start", methods=["POST"])
+@auth_needed
+def send_start():
+    remote = request.form["remote"]
+    key = request.form["key"]
+    http = urllib3.PoolManager()
+    response = http.request('POST', backend + '/send_start', fields={ "remote" : remote, "key" : key })
+
+# It sends send_stop events from remote controls to backend. Required when user is outside the local network.
+@app.route("/send_stop", methods=["POST"])
+@auth_needed
+def send_stop():
+    remote = request.form["remote"]
+    key = request.form["key"]
+    http = urllib3.PoolManager()
+    response = http.request('POST', backend + '/send_stop', fields={ "remote" : remote, "key" : key })
+
+# It serves resource files.
 @app.route("/<path:path>")
 def files(path):
     extension = os.path.basename(path).split('.')[-1]
@@ -42,5 +133,6 @@ def files(path):
         return e.strerror, 404, { "Content-Type" : "text/plain" }
     return data, 200, { "Content-Type" : mimetypes.types_map['.' + extension] }
 
+# Runs Flask app
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=80, threaded=True)
